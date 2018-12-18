@@ -20,6 +20,24 @@ export interface ReversePathResolverConfig {
 }
 
 export namespace PathResolver {
+  /**
+   * Determines whether the given path is subpath of the goven ancestor.
+   * @param path path to check.
+   * @param ancestor ancestor path.
+   * @param subfolders whether to accept subfolders of the ancestor path.
+   */
+  export function match(path: string, ancestor: string, subfolders?: boolean) {
+    if (!path) {
+      throw new TypeError('path must be defined');
+    }
+    const sub = undefined === subfolders ? true : subfolders;
+    const relative = fspath.normalize(fspath.relative(ancestor, path));
+    if (!relative || relative.startsWith('..') || fspath.isAbsolute(relative)) {
+      return false;
+    }
+    return sub || !relative.includes(fspath.sep);
+  }
+
   export function from(config: PathResolverConfig): PathResolver {
     return (path: string, base?: string) => {
       if (!path || !path.endsWith(config.sourceExt)) {

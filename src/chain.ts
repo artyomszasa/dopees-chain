@@ -8,6 +8,7 @@ import * as mkdirp from 'mkdirp';
 import * as colors from 'colors/safe';
 import * as nodeWatch from 'node-watch';
 import * as derived from './derived';
+import * as mutex from './mutex';
 
 const mkdirrec = (path: string): Promise<mkdirp.Made> => new Promise((resolve, reject) => mkdirp(path, (err, res) => err ? reject(err) : resolve(res)));
 const fsp = fs.promises;
@@ -228,9 +229,29 @@ export class Helpers {
   }
 }
 
+export function task(name: string, action: Executor): Executor {
+  return (task: Task, context: Context) => {
+    if (task.name instanceof LogicalName && task.name.name === name) {
+      return action(task, context);
+    }
+  };
+}
+
+export function subtask(name: string, action: (context: Context) => Task|Task[]|Promise<Task|Task[]>): Executor {
+  return task(name, async (_, context) => {
+    const tasks = await action(context);
+    if (tasks instanceof Task) {
+      await context.execute(tasks);
+    } else {
+      await Promise.all(tasks.map(task => context.execute(task)));
+    }
+  })
+}
+
 export {
   Task, TaskName, FileName, LogicalName, Context, Executor, Executors,
   PathResolver, ReversePathResolver, PathResolverConfig, ReversePathResolverConfig,
   executors,
-  derived
+  derived,
+  mutex
 }

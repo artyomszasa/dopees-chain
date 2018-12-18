@@ -37,6 +37,9 @@ export class Task {
   static file(path: string, root?: string, state?: any) {
     return new Task(new FileName(path, root), state);
   }
+  static logical(name: string, state?: any) {
+    return new Task(new LogicalName(name), state);
+  }
   name: TaskName
   state: any
   constructor(name: TaskName, state?: any) {
