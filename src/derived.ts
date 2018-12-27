@@ -75,7 +75,7 @@ export abstract class FileMapper<TOptions, TInnerState, TState extends FileMappe
         let innerState: TInnerState;
         let cached: CachedState<TInnerState>|undefined;
         if (sourceMtime && (cached = await context.storage.getObject<CachedState<TInnerState>>(`!${innerStateKey}!${sourceName.path}`)) && cached.mtime <= sourceMtime) {
-          context.log(this.name, task, 'reusing cached state');
+          context.log(this.name, task, `reusing cached state ${cached.mtime} <= ${sourceMtime}`);
           innerState = cached.value;
         } else {
           context.log(this.name, task, 'reading input...');
