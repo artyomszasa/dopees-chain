@@ -77,18 +77,19 @@ export class DefaultContext implements Context {
   getContents(task: Task): Promise<Buffer>;
   getContents(task: Task, encoding: string): Promise<string>;
   async getContents(task: Task, encoding?: string) {
-    // check if task has stored contents
-    const taskContents = task.state.contents;
-    if (taskContents instanceof Buffer) {
-      return encoding ? taskContents.toString(encoding) : taskContents;
-    }
     const name = task.name;
     if (name instanceof FileName) {
-      // if task represents a file...
       // ...try get cached contents
       if (this.contentCache[name.path]) {
         return encoding ? this.contentCache[name.path].toString(encoding) : this.contentCache[name.path];
       }
+    }
+    // ...check if task has stored contents...
+    const taskContents = task.state.contents;
+    if (taskContents instanceof Buffer) {
+      return encoding ? taskContents.toString(encoding) : taskContents;
+    }
+    if (name instanceof FileName) {
       // ...or load and store file contents
       const contents = await fsp.readFile(name.path);
       this.contentCache[name.path] = contents;
