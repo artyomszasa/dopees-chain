@@ -28,6 +28,11 @@ interface CachedState<T> {
   readonly value: T;
 }
 
+const dateToString = (date: Date) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} `
+    + `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
 export abstract class FileMapper<TOptions, TInnerState, TState extends FileMapperState> extends StructuredExecutor<TOptions, TState> {
   protected createSourceTask(state: TState, task: Task, sourcePath: string, context: Context): Task {
     return Task.file(sourcePath, context.basePath);
@@ -74,8 +79,8 @@ export abstract class FileMapper<TOptions, TInnerState, TState extends FileMappe
         const innerStateKey = state.innerStateKey || `${this.name}.innerState`;
         let innerState: TInnerState;
         let cached: CachedState<TInnerState>|undefined;
-        if (sourceMtime && (cached = await context.storage.getObject<CachedState<TInnerState>>(`!${innerStateKey}!${sourceName.path}`)) && cached.mtime <= sourceMtime) {
-          context.log(this.name, task, `reusing cached state ${cached.mtime} <= ${sourceMtime}`);
+        if (sourceMtime && (cached = await context.storage.getObject<CachedState<TInnerState>>(`!${innerStateKey}!${sourceName.path}`)) && cached.mtime >= sourceMtime) {
+          context.log(this.name, task, `reusing cached state ${dateToString(cached.mtime)} >= ${dateToString(sourceMtime)}`);
           innerState = cached.value;
         } else {
           context.log(this.name, task, 'reading input...');
