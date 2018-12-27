@@ -32,7 +32,7 @@ const fsp = fs.promises;
 
 
 interface ContentCache {
-  [path: string]: Buffer
+  [path: string]: { mtime: Date, data: Buffer }
 }
 
 const durationToString = (duration : [number, number]) => String(duration[0] * 1000 + Math.round(duration[1] / 1000) / 1000);
@@ -79,41 +79,48 @@ export class DefaultContext implements Context {
   async getContents(task: Task, encoding?: string) {
     const name = task.name;
     if (name instanceof FileName) {
+      const mtime = await fsp.stat(name.path).then(stat => stat.mtime);
       // ...try get cached contents
-      if (this.contentCache[name.path]) {
-        return encoding ? this.contentCache[name.path].toString(encoding) : this.contentCache[name.path];
+      if (this.contentCache[name.path] && this.contentCache[name.path].mtime >= mtime) {
+        return encoding ? this.contentCache[name.path].data.toString(encoding) : this.contentCache[name.path];
       }
+      // ...or load and store file contents
+      const contents = await fsp.readFile(name.path);
+      this.contentCache[name.path] = { mtime, data: contents };
+      return encoding ? contents.toString(encoding) : contents;
     }
-    // ...check if task has stored contents...
     const taskContents = task.state.contents;
     if (taskContents instanceof Buffer) {
       return encoding ? taskContents.toString(encoding) : taskContents;
-    }
-    if (name instanceof FileName) {
-      // ...or load and store file contents
-      const contents = await fsp.readFile(name.path);
-      this.contentCache[name.path] = contents;
-      return encoding ? contents.toString(encoding) : contents;
     }
     // fail of task is not a file and has no stored contents
     throw new Error(`unable to get contents for ${task.name}`);
   }
   async saveContents(task: Task, data: Buffer, persist?: boolean) {
     const taskName = task.name;
-    const key = taskName instanceof FileName ? taskName.path : taskName.name;
-    this.contentCache[key] = data;
-    if (persist) {
-      if (taskName instanceof FileName) {
+    let key: string;
+    let mtime: Date;
+    if (taskName instanceof FileName) {
+      // const key = taskName instanceof FileName ? taskName.path : taskName.name;
+      key = taskName.path;
+      if (persist) {
         await mkdirrec(fspath.dirname(taskName.path));
         await fsp.writeFile(taskName.path, data);
-        const mtime = await fsp.stat(taskName.path).then(stats => stats.mtime, () => null);
-        if (mtime) {
-          await Helpers.setMtime(task, mtime, this);
+        const mtime0 = await fsp.stat(taskName.path).then(stats => stats.mtime, () => null);
+        if (mtime0) {
+          mtime = mtime0;
+          await Helpers.setMtime(task, mtime0, this);
+        } else {
+          mtime = new Date();
         }
       } else {
-        throw new Error(`unable to persist task contents for ${taskName}: not a file`);
+        mtime = new Date();
       }
+    } else {
+      key = taskName.name;
+      mtime = new Date();
     }
+    this.contentCache[key] = { mtime, data };
     return task.updateState({
       ...task.state,
       contents: data
